@@ -44,6 +44,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import edu.up.isgc.juegos_rlg.ui.theme.Juegos_rlgTheme
 import java.util.Random
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -134,7 +136,7 @@ fun HomePreview() {
 @Composable
 fun Buscaminas(name: String, modifier: Modifier = Modifier, navController: NavController, mensaje : () -> Unit) {
     val columnas = 7
-    val filas = 14
+    val filas = 12
 
     val estadoBotones = remember {
         List(filas * columnas) { mutableStateOf(true) }
@@ -274,12 +276,110 @@ fun asignaMina(): Boolean{
 
 @Composable
 fun EncuentraTopo(modifier: Modifier, navController: NavController) {
+    val filas = 12
+    val columnas = 7
+    val total = filas * columnas
+    val intervalos = 900L
+    val gameTime = 31
+
+    val topoIndex = remember { mutableStateOf(Random().nextInt(total)) }
+    val clicks = remember { mutableStateOf(0) }
+    val visible = remember { mutableStateOf(true) }
+    val juegoActivo = remember { mutableStateOf(false) }
+    val tiempoRestante = remember { mutableStateOf(gameTime) }
+    val verResultado = remember { mutableStateOf(false) }
+
+    LaunchedEffect(juegoActivo.value) {
+        if (!juegoActivo.value) return@LaunchedEffect
+        tiempoRestante.value = gameTime
+        clicks.value = 0
+        while (tiempoRestante.value > 0) {
+            delay(1000L)
+            tiempoRestante.value--
+        }
+        juegoActivo.value = false
+        verResultado.value = true
+    }
+
+    LaunchedEffect(juegoActivo.value) {
+        if (!juegoActivo.value) return@LaunchedEffect
+        while (juegoActivo.value) {
+            visible.value = true
+            topoIndex.value = Random().nextInt(total)
+            delay(intervalos)
+            visible.value = false
+            delay(200L)
+        }
+        visible.value = false
+    }
+
     Column(
-        modifier = modifier,
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(8.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
-    ){
-        Text("EncuentraTopo")
+    ) {
+        Text(
+            text = if (juegoActivo.value) "Tiempo: ${tiempoRestante.value}s  |  Clicks: ${clicks.value}"
+            else "¡Golpea al topo!",
+            color = Color.White,
+            style = TextStyle(fontSize = 18.sp),
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        for (i in 0 until filas) {
+            Row(modifier = Modifier.weight(1f)) {
+                for (j in 0 until columnas) {
+                    val index = i * columnas + j
+                    val esTopo = visible.value && index == topoIndex.value
+
+                    Button(
+                        onClick = {
+                            if (!juegoActivo.value) {
+                                juegoActivo.value = true
+                                return@Button
+                            }
+                            if (esTopo) clicks.value++
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .padding(2.dp),
+                        shape = RectangleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (esTopo) Color(0xFFFF9500) else Color.White,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = if (esTopo) "&" else "||",
+                            style = TextStyle(fontSize = if (esTopo) 14.sp else 14.sp),
+                            color = if (esTopo) Color.White else Color(0xFFBBBBBB)
+                        )
+                    }
+                }
+            }
+        }
+
+        if (verResultado.value) {
+            AlertDialog(
+                onDismissRequest = { verResultado.value = false },
+                title = { Text("¡Tiempo!") },
+                text = { Text("Golpeaste al topo ${clicks.value} veces") },
+                confirmButton = {
+                    Button(onClick = {
+                        verResultado.value = false
+                        clicks.value = 0
+                        tiempoRestante.value = 15
+                        visible.value = false
+                    }) {
+                        Text("Jugar de nuevo")
+                    }
+                }
+            )
+        }
     }
 }
 
